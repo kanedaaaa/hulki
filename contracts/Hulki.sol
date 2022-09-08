@@ -15,121 +15,174 @@ contract Hulki is ERC721URIStorage, Ownable {
         string warURI;
         string battleURI;
         string valhallaURI;
-        Counters.Counter bannerID;
-        Counters.Counter beastID;
-        Counters.Counter warID;
-        Counters.Counter battleID;
-        Counters.Counter valhallaID;
         uint256 bannerTS;
         uint256 beastTS;
         uint256 warTS;
         uint256 battleTS;
         uint256 valhallaTS;
-    }
-
-    struct MultiPack {
-        uint256 bannerPack;
-        uint256 beastPack;
-        uint256 warPack;
-        uint256 battlePack;
-        uint256 valhallaPack;
+        uint256 price;
     }
 
     /** @notice token uris, counters and supply */
     HulkiInfo hulkiInfo;
-    /** @notice total supply of each multi pack */
-    MultiPack multiPack;
     /** @notice approved managers, such as staking contract */
     mapping(address => bool) public approved;
+    /** @notice token IDs, required for staking */
+    uint256[] public valhallaTokens;
+    uint256[] public battleTokens;
+    uint256[] public warTokens;
+    uint256[] public beastTokens;
+    uint256[] public mintedInLastRoundTokens;
+    /** @notice minting (5) rounds */
+    uint8 public _round;
+
+    /** @notice counters for nft ids */
+    Counters.Counter bannerID;
+    Counters.Counter beastID;
+    Counters.Counter warID;
+    Counters.Counter battleID;
+    Counters.Counter valhallaID;
 
     constructor() ERC721("Hulki", "H") {
         approved[msg.sender] = true;
     }
 
     /**
-    * @notice public mint function
-    * @param _mode => 0.called from staking contract
-    * 1.multipack mint
-    * @param _evo => evolution of nft
-    * @param _multiPack => if _mode 1 was chosen, then 
-    * this param will handle which multipack to mint.
+     * @notice public mint function
+     * @param _mode => 0.called from staking contract
+     * 1.multipack mint
+     * @param _amount => amount of nfts to mint
+     * @param _evo => evolution of nft
+     * @param _tokenId => token to burn. in case evolution
+     * is chosen as a mint option.
      */
-    function mint(uint8 _mode, uint8 _evo, uint8 _multiPack) public {
+    function mint(
+        uint8 _mode,
+        uint8 _amount,
+        uint8 _evo,
+        uint256 _tokenId
+    ) public payable {
         if (_mode == 0) {
             // staking mint
             require(approved[msg.sender], "msg.sender is not approved");
-            _lowMint(_evo, 1);
+            evolve(_evo, _tokenId, msg.sender);
+
+            if (_evo == 4) {
+                valhallaTokens.push(_tokenId);
+            }
         } else if (_mode == 1) {
-            // multipack mint
-            if (_multiPack == 0) {
-                _lowMint(0, multiPack.bannerPack);
-            } else if (_multiPack == 1) {
-                _lowMint(1, multiPack.beastPack);
-            } else if (_multiPack == 2) {
-                _lowMint(2, multiPack.warPack);
-            } else if (_multiPack == 3) {
-                _lowMint(3, multiPack.battlePack);
-            } else if (_multiPack == 4) {
-                _lowMint(4, multiPack.valhallaPack);
+            require(msg.value >= hulkiInfo.price * _amount, "Price not paid");
+            if (_round == 0) {
+                _lowMint(0, _amount, msg.sender);
+                if (_amount >= 5 && _amount < 10) {
+                    _lowMint(1, 1, msg.sender);
+                } else if (_amount >= 10 && _amount < 15) {
+                    _lowMint(2, 1, msg.sender);
+                } else if (_amount >= 15 && _amount < 20) {
+                    _lowMint(3, 1, msg.sender);
+                } else if (_amount >= 20) {
+                    _lowMint(4, 1, msg.sender);
+                    valhallaTokens.push(_tokenId);
+                }
+            } else if (_round == 1) {
+                _lowMint(0, _amount, msg.sender);
+                if (_amount >= 5 && _amount < 10) {
+                    _lowMint(1, 1, msg.sender);
+                } else if (_amount >= 10 && _amount < 15) {
+                    _lowMint(2, 1, msg.sender);
+                } else if (_amount >= 15) {
+                    _lowMint(3, 1, msg.sender);
+                }
+            } else if (_round == 2) {
+                _lowMint(0, _amount, msg.sender);
+                if (_amount >= 5 && _amount < 10) {
+                    _lowMint(1, 1, msg.sender);
+                } else if (_amount >= 10) {
+                    _lowMint(2, 1, msg.sender);
+                }
+            } else if (_round == 3) {
+                _lowMint(0, _amount, msg.sender);
+                if (_amount >= 5) {
+                    _lowMint(1, 1, msg.sender);
+                }
+            } else if (_round == 5) {
+                _lowMint(0, _amount, msg.sender);
             }
         }
     }
 
+    function evolve(
+        uint8 _evo,
+        uint256 _tokenId,
+        address _to
+    ) internal {
+        _burn(_tokenId);
+        if (_evo != 5) {
+            _lowMint(_evo + 1, 1, _to);
+        } else {
+            revert("Cant evolve valhalla");
+        }
+    }
+
     /**
-    * @notice internal mint function for cleaner code
-    * @param _evo => stands for evolution of nft
-    * @param _amount => amount of nfts to mint
-    *
-    * since we have multiple tiers of tokens, we need to set
-    * separate tokenURIs for each. using openzeppelin library,
-    * during the mint each token will get their own custom URI.
+     * @notice internal mint function for cleaner code
+     * @param _evo => stands for evolution of nft
+     * @param _amount => amount of nfts to mint
+     *
+     * since we have multiple tiers of tokens, we need to set
+     * separate tokenURIs for each. using openzeppelin library,
+     * during the mint each token will get their own custom URI.
      */
-    function _lowMint(uint8 _evo, uint256 _amount) internal {
+    function _lowMint(
+        uint8 _evo,
+        uint256 _amount,
+        address _to
+    ) internal {
         if (_evo == 0) {
             require(
-                hulkiInfo.bannerID.current() + _amount <= hulkiInfo.bannerTS
+                bannerID.current() + _amount <= hulkiInfo.bannerTS
             );
             for (uint256 x; x < _amount; x++) {
-                hulkiInfo.bannerID.increment();
-                _safeMint(msg.sender, hulkiInfo.bannerID.current());
+                bannerID.increment();
+                _safeMint(_to, bannerID.current());
                 _setTokenURI(
-                    hulkiInfo.bannerID.current(),
+                    bannerID.current(),
                     string(
                         abi.encodePacked(
                             hulkiInfo.bannerURI,
-                            hulkiInfo.bannerID.current().toString(),
+                            bannerID.current().toString(),
                             ".json"
                         )
                     )
                 );
             }
         } else if (_evo == 1) {
-            require(hulkiInfo.beastID.current() + _amount <= hulkiInfo.beastTS);
+            require(beastID.current() + _amount <= hulkiInfo.beastTS);
             for (uint256 x; x < _amount; x++) {
-                hulkiInfo.beastID.increment();
-                _safeMint(msg.sender, hulkiInfo.beastID.current());
+                beastID.increment();
+                _safeMint(_to, beastID.current());
                 _setTokenURI(
-                    hulkiInfo.beastID.current(),
+                    beastID.current(),
                     string(
                         abi.encodePacked(
                             hulkiInfo.beastURI,
-                            hulkiInfo.beastID.current().toString(),
+                            beastID.current().toString(),
                             ".json"
                         )
                     )
                 );
             }
         } else if (_evo == 2) {
-            require(hulkiInfo.warID.current() + _amount <= hulkiInfo.warTS);
+            require(warID.current() + _amount <= hulkiInfo.warTS);
             for (uint256 x; x < _amount; x++) {
-                hulkiInfo.warID.increment();
-                _safeMint(msg.sender, hulkiInfo.warID.current());
+                warID.increment();
+                _safeMint(_to, warID.current());
                 _setTokenURI(
-                    hulkiInfo.warID.current(),
+                    warID.current(),
                     string(
                         abi.encodePacked(
                             hulkiInfo.warURI,
-                            hulkiInfo.warID.current().toString(),
+                            warID.current().toString(),
                             ".json"
                         )
                     )
@@ -137,17 +190,17 @@ contract Hulki is ERC721URIStorage, Ownable {
             }
         } else if (_evo == 3) {
             require(
-                hulkiInfo.battleID.current() + _amount <= hulkiInfo.battleTS
+                battleID.current() + _amount <= hulkiInfo.battleTS
             );
             for (uint256 x; x < _amount; x++) {
-                hulkiInfo.battleID.increment();
-                _safeMint(msg.sender, hulkiInfo.battleID.current());
+                battleID.increment();
+                _safeMint(_to, battleID.current());
                 _setTokenURI(
-                    hulkiInfo.battleID.current(),
+                    battleID.current(),
                     string(
                         abi.encodePacked(
                             hulkiInfo.battleURI,
-                            hulkiInfo.battleID.current().toString(),
+                            battleID.current().toString(),
                             ".json"
                         )
                     )
@@ -155,17 +208,17 @@ contract Hulki is ERC721URIStorage, Ownable {
             }
         } else if (_evo == 4) {
             require(
-                hulkiInfo.valhallaID.current() + _amount <= hulkiInfo.valhallaTS
+                valhallaID.current() + _amount <= hulkiInfo.valhallaTS
             );
             for (uint256 x; x < _amount; x++) {
-                hulkiInfo.valhallaID.increment();
-                _safeMint(msg.sender, hulkiInfo.valhallaID.current());
+                valhallaID.increment();
+                _safeMint(_to, valhallaID.current());
                 _setTokenURI(
-                    hulkiInfo.valhallaID.current(),
+                    valhallaID.current(),
                     string(
                         abi.encodePacked(
                             hulkiInfo.valhallaURI,
-                            hulkiInfo.valhallaID.current().toString(),
+                            valhallaID.current().toString(),
                             ".json"
                         )
                     )
@@ -176,12 +229,40 @@ contract Hulki is ERC721URIStorage, Ownable {
         }
     }
 
-    /** 
-    * @notice manage approved members. should be handled with care
-    * @param _user => address of manager
-    * @param _state => remove or add them
+    /**
+     * @notice manage approved members. should be handled with care
+     * @param _user => address of manager
+     * @param _state => remove or add them
      */
     function setApproved(address _user, bool _state) public onlyOwner {
         approved[_user] = _state;
+    }
+
+    function setHulkiInfo(
+        string memory _bannerUri,
+        string memory _beastUri,
+        string memory _warUri,
+        string memory _battleUri,
+        string memory _valhallaUri,
+        uint256 _bannerTs,
+        uint256 _beastTs,
+        uint256 _warTs,
+        uint256 _battleTs,
+        uint256 _valhallaTs,
+        uint256 _price
+    ) public onlyOwner {
+        hulkiInfo = HulkiInfo(
+            _bannerUri,
+            _beastUri,
+            _warUri,
+            _battleUri,
+            _valhallaUri,
+            _bannerTs,
+            _beastTs,
+            _warTs,
+            _battleTs,
+            _valhallaTs,
+            _price
+        );
     }
 }
