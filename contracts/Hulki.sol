@@ -34,7 +34,7 @@ contract Hulki is ERC721URIStorage, Ownable {
     uint256[] public beastTokens;
     uint256[] public mintedInLastRoundTokens;
     /** @notice minting (5) rounds */
-    uint8 public _round;
+    uint8 public round;
 
     /** @notice counters for nft ids */
     Counters.Counter bannerID;
@@ -72,45 +72,63 @@ contract Hulki is ERC721URIStorage, Ownable {
             }
         } else if (_mode == 1) {
             require(msg.value >= hulkiInfo.price * _amount, "Price not paid");
-            if (_round == 0) {
+            if (round == 0) {
                 _lowMint(0, _amount, msg.sender);
                 if (_amount >= 5 && _amount < 10) {
                     _lowMint(1, 1, msg.sender);
+                    beastTokens.push(beastID.current());
                 } else if (_amount >= 10 && _amount < 15) {
                     _lowMint(2, 1, msg.sender);
+                    warTokens.push(warID.current());
                 } else if (_amount >= 15 && _amount < 20) {
                     _lowMint(3, 1, msg.sender);
+                    battleTokens.push(battleID.current());
                 } else if (_amount >= 20) {
                     _lowMint(4, 1, msg.sender);
-                    valhallaTokens.push(_tokenId);
+                    valhallaTokens.push(valhallaID.current());
                 }
-            } else if (_round == 1) {
+            } else if (round == 1) {
                 _lowMint(0, _amount, msg.sender);
                 if (_amount >= 5 && _amount < 10) {
                     _lowMint(1, 1, msg.sender);
+                    beastTokens.push(beastID.current());
                 } else if (_amount >= 10 && _amount < 15) {
                     _lowMint(2, 1, msg.sender);
+                    warTokens.push(warID.current());
                 } else if (_amount >= 15) {
                     _lowMint(3, 1, msg.sender);
-                }
-            } else if (_round == 2) {
+                    battleTokens.push(battleID.current());
+                } 
+            } else if (round == 2) {
                 _lowMint(0, _amount, msg.sender);
                 if (_amount >= 5 && _amount < 10) {
                     _lowMint(1, 1, msg.sender);
+                    beastTokens.push(beastID.current());
                 } else if (_amount >= 10) {
                     _lowMint(2, 1, msg.sender);
+                    warTokens.push(warID.current());
                 }
-            } else if (_round == 3) {
+            } else if (round == 3) {
                 _lowMint(0, _amount, msg.sender);
                 if (_amount >= 5) {
                     _lowMint(1, 1, msg.sender);
+                    beastTokens.push(beastID.current());
                 }
-            } else if (_round == 5) {
+            } else if (round == 5) {
                 _lowMint(0, _amount, msg.sender);
+                mintedInLastRoundTokens.push(bannerID.current());
             }
         }
     }
 
+    /**
+    * @notice evolution is a process of sending lower evo tokens 
+    * and in exchange getting higher evo token. Called by staking
+    * contract.
+    * @param _evo => level of evolution
+    * @param _tokenId => id of token to burn
+    * @param _to => "msg.sender"
+     */
     function evolve(
         uint8 _evo,
         uint256 _tokenId,
@@ -139,9 +157,7 @@ contract Hulki is ERC721URIStorage, Ownable {
         address _to
     ) internal {
         if (_evo == 0) {
-            require(
-                bannerID.current() + _amount <= hulkiInfo.bannerTS
-            );
+            require(bannerID.current() + _amount <= hulkiInfo.bannerTS);
             for (uint256 x; x < _amount; x++) {
                 bannerID.increment();
                 _safeMint(_to, bannerID.current());
@@ -189,9 +205,7 @@ contract Hulki is ERC721URIStorage, Ownable {
                 );
             }
         } else if (_evo == 3) {
-            require(
-                battleID.current() + _amount <= hulkiInfo.battleTS
-            );
+            require(battleID.current() + _amount <= hulkiInfo.battleTS);
             for (uint256 x; x < _amount; x++) {
                 battleID.increment();
                 _safeMint(_to, battleID.current());
@@ -207,9 +221,7 @@ contract Hulki is ERC721URIStorage, Ownable {
                 );
             }
         } else if (_evo == 4) {
-            require(
-                valhallaID.current() + _amount <= hulkiInfo.valhallaTS
-            );
+            require(valhallaID.current() + _amount <= hulkiInfo.valhallaTS);
             for (uint256 x; x < _amount; x++) {
                 valhallaID.increment();
                 _safeMint(_to, valhallaID.current());
@@ -238,6 +250,12 @@ contract Hulki is ERC721URIStorage, Ownable {
         approved[_user] = _state;
     }
 
+    /**
+     * @notice set hulki info
+     * @param _bannerUri => etc, token URIs
+     * @param _bannerTs => etc, total supply
+     * @param _price => token price in eth (*10**18)
+     */
     function setHulkiInfo(
         string memory _bannerUri,
         string memory _beastUri,
@@ -264,5 +282,34 @@ contract Hulki is ERC721URIStorage, Ownable {
             _valhallaTs,
             _price
         );
+    }
+
+    /**
+     * @notice set minting round, 0 to 4 (1 to 5)
+     * @param _round => 0 to 4 (1 to 5)
+     */
+    function setRound(uint8 _round) public onlyOwner {
+        require(_round <= 4, "Wrong round");
+        round = _round;
+    }
+
+    /**
+    * @notice getter function for checking which ID belongs to which evo
+    * @param _mode => valhalla, battle, war, etc.
+    * */
+    function getTokenIds(uint8 _mode) public view returns (uint256[] memory) {
+        if (_mode == 0) {
+            return valhallaTokens;
+        } else if (_mode == 1) {
+            return battleTokens;
+        } else if (_mode == 2) {
+            return warTokens;
+        } else if (_mode == 3) {
+            return beastTokens;
+        } else if (_mode == 4) {
+            return mintedInLastRoundTokens;
+        } else {
+            revert("Wrong _mode");
+        }
     }
 }
