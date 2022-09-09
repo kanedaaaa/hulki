@@ -48,16 +48,16 @@ describe("Hulki", () => {
          
         hulki.connect(user).mint(
             1,
-            2,
+            4,
             0,
             0
         );
 
-        let ownerof = await hulki.ownerOf(1);
+        let ownerof = await hulki.ownerOf(2);
         expect(ownerof).to.equal(user.address);
 
-        let mintedInLastRound = await hulki.getTokenIds(4) 
-        //console.log(mintedInLastRound); // gotta expect this
+        let mintedInLastRound = await hulki.getTokenIdsMintedInLastRound();
+        console.log(mintedInLastRound);
     });
 
     it("minting tokens with multipack", async () => {
@@ -66,14 +66,13 @@ describe("Hulki", () => {
 
         await hulki.connect(user).mint(
             1, 
-            9,
+            7,
             0,
             0
         );
 
-        let beast = await hulki.getTokenIds(3);
-
-        console.log(beast)
-    })
+        let ownerof = await hulki.ownerOf(1801);
+        expect(ownerof).to.equal(user.address);
+    });
   });
 });

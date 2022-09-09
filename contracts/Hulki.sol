@@ -33,10 +33,10 @@ contract Hulki is ERC721URIStorage, Ownable {
 
     /** @notice counters for nft ids */
     uint256 bannerId = 0;
-    uint256 beastId = 201;
-    uint256 warId = 401;
-    uint256 battleId = 601;
-    uint256 valhallaId = 801;
+    uint256 beastId = 1800;
+    uint256 warId = 2400;
+    uint256 battleId = 2800;
+    uint256 valhallaId = 3000;
 
     constructor() ERC721("Hulki", "H") {
         approved[msg.sender] = true;
@@ -139,7 +139,7 @@ contract Hulki is ERC721URIStorage, Ownable {
         bool _lastRound
     ) internal {
         if (_evo == 0) {
-            require(bannerId + _amount <= hulkiInfo.bannerTS);
+            //require(bannerId + _amount <= hulkiInfo.bannerTS);
             for (uint256 x; x < _amount; x++) {
                 bannerId++;
                 _safeMint(_to, bannerId);
@@ -159,7 +159,7 @@ contract Hulki is ERC721URIStorage, Ownable {
                 }
             }
         } else if (_evo == 1) {
-            require(beastId + _amount <= hulkiInfo.beastTS);
+            //require(beastId + _amount <= hulkiInfo.beastTS);
             for (uint256 x; x < _amount; x++) {
                 beastId++;
                 _safeMint(_to, beastId);
@@ -175,7 +175,7 @@ contract Hulki is ERC721URIStorage, Ownable {
                 );
             }
         } else if (_evo == 2) {
-            require(warId + _amount <= hulkiInfo.warTS);
+            //require(warId + _amount <= hulkiInfo.warTS);
             for (uint256 x; x < _amount; x++) {
                 warId++;
                 _safeMint(_to, warId);
@@ -191,7 +191,7 @@ contract Hulki is ERC721URIStorage, Ownable {
                 );
             }
         } else if (_evo == 3) {
-            require(battleId + _amount <= hulkiInfo.battleTS);
+            //require(battleId + _amount <= hulkiInfo.battleTS);
             for (uint256 x; x < _amount; x++) {
                 battleId++;
                 _safeMint(_to, battleId);
@@ -207,7 +207,7 @@ contract Hulki is ERC721URIStorage, Ownable {
                 );
             }
         } else if (_evo == 4) {
-            require(valhallaId + _amount <= hulkiInfo.valhallaTS);
+            //require(valhallaId + _amount <= hulkiInfo.valhallaTS);
             for (uint256 x; x < _amount; x++) {
                 valhallaId++;
                 _safeMint(_to, valhallaId);
