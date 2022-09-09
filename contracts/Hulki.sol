@@ -7,7 +7,6 @@ import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
 
 contract Hulki is ERC721URIStorage, Ownable {
     using Strings for uint256;
-    using Counters for Counters.Counter;
 
     struct HulkiInfo {
         string bannerURI;
@@ -28,20 +27,16 @@ contract Hulki is ERC721URIStorage, Ownable {
     /** @notice approved managers, such as staking contract */
     mapping(address => bool) public approved;
     /** @notice token IDs, required for staking */
-    uint256[] public valhallaTokens;
-    uint256[] public battleTokens;
-    uint256[] public warTokens;
-    uint256[] public beastTokens;
     uint256[] public mintedInLastRoundTokens;
     /** @notice minting (5) rounds */
     uint8 public round;
 
     /** @notice counters for nft ids */
-    Counters.Counter bannerID;
-    Counters.Counter beastID;
-    Counters.Counter warID;
-    Counters.Counter battleID;
-    Counters.Counter valhallaID;
+    uint256 bannerId = 0;
+    uint256 beastId = 201;
+    uint256 warId = 401;
+    uint256 battleId = 601;
+    uint256 valhallaId = 801;
 
     constructor() ERC721("Hulki", "H") {
         approved[msg.sender] = true;
@@ -66,57 +61,43 @@ contract Hulki is ERC721URIStorage, Ownable {
             // staking mint
             require(approved[msg.sender], "msg.sender is not approved");
             evolve(_evo, _tokenId, msg.sender);
-
-            if (_evo == 4) {
-                valhallaTokens.push(_tokenId);
-            }
         } else if (_mode == 1) {
-            require(msg.value >= hulkiInfo.price * _amount, "Price not paid");
+            //require(msg.value >= hulkiInfo.price * _amount, "Price not paid");
             if (round == 0) {
-                _lowMint(0, _amount, msg.sender);
+                _lowMint(0, _amount, msg.sender, false);
                 if (_amount >= 5 && _amount < 10) {
-                    _lowMint(1, 1, msg.sender);
-                    beastTokens.push(beastID.current());
+                    _lowMint(1, 1, msg.sender, false);
                 } else if (_amount >= 10 && _amount < 15) {
-                    _lowMint(2, 1, msg.sender);
-                    warTokens.push(warID.current());
+                    _lowMint(2, 1, msg.sender, false);
                 } else if (_amount >= 15 && _amount < 20) {
-                    _lowMint(3, 1, msg.sender);
-                    battleTokens.push(battleID.current());
+                    _lowMint(3, 1, msg.sender, false);
                 } else if (_amount >= 20) {
-                    _lowMint(4, 1, msg.sender);
-                    valhallaTokens.push(valhallaID.current());
+                    _lowMint(4, 1, msg.sender, false);
                 }
             } else if (round == 1) {
-                _lowMint(0, _amount, msg.sender);
+                _lowMint(0, _amount, msg.sender, false);
                 if (_amount >= 5 && _amount < 10) {
-                    _lowMint(1, 1, msg.sender);
-                    beastTokens.push(beastID.current());
+                    _lowMint(1, 1, msg.sender, false);
                 } else if (_amount >= 10 && _amount < 15) {
-                    _lowMint(2, 1, msg.sender);
-                    warTokens.push(warID.current());
+                    _lowMint(2, 1, msg.sender, false);
                 } else if (_amount >= 15) {
-                    _lowMint(3, 1, msg.sender);
-                    battleTokens.push(battleID.current());
+                    _lowMint(3, 1, msg.sender, false);
                 } 
             } else if (round == 2) {
-                _lowMint(0, _amount, msg.sender);
+                _lowMint(0, _amount, msg.sender, false);
                 if (_amount >= 5 && _amount < 10) {
-                    _lowMint(1, 1, msg.sender);
-                    beastTokens.push(beastID.current());
+                    _lowMint(1, 1, msg.sender, false);
                 } else if (_amount >= 10) {
-                    _lowMint(2, 1, msg.sender);
-                    warTokens.push(warID.current());
+                    _lowMint(2, 1, msg.sender, false);
                 }
             } else if (round == 3) {
-                _lowMint(0, _amount, msg.sender);
+                _lowMint(0, _amount, msg.sender, false);
                 if (_amount >= 5) {
-                    _lowMint(1, 1, msg.sender);
-                    beastTokens.push(beastID.current());
+                    _lowMint(1, 1, msg.sender, false);
                 }
-            } else if (round == 5) {
-                _lowMint(0, _amount, msg.sender);
-                mintedInLastRoundTokens.push(bannerID.current());
+            } else if (round == 4) {
+                _lowMint(0, _amount, msg.sender, true);
+                
             }
         }
     }
@@ -136,7 +117,7 @@ contract Hulki is ERC721URIStorage, Ownable {
     ) internal {
         _burn(_tokenId);
         if (_evo != 5) {
-            _lowMint(_evo + 1, 1, _to);
+            _lowMint(_evo + 1, 1, _to, false);
         } else {
             revert("Cant evolve valhalla");
         }
@@ -154,83 +135,88 @@ contract Hulki is ERC721URIStorage, Ownable {
     function _lowMint(
         uint8 _evo,
         uint256 _amount,
-        address _to
+        address _to,
+        bool _lastRound
     ) internal {
         if (_evo == 0) {
-            require(bannerID.current() + _amount <= hulkiInfo.bannerTS);
+            require(bannerId + _amount <= hulkiInfo.bannerTS);
             for (uint256 x; x < _amount; x++) {
-                bannerID.increment();
-                _safeMint(_to, bannerID.current());
+                bannerId++;
+                _safeMint(_to, bannerId);
                 _setTokenURI(
-                    bannerID.current(),
+                    bannerId,
                     string(
                         abi.encodePacked(
                             hulkiInfo.bannerURI,
-                            bannerID.current().toString(),
+                            bannerId.toString(),
                             ".json"
                         )
                     )
                 );
+
+                if (_lastRound) {
+                    mintedInLastRoundTokens.push(bannerId);
+                }
             }
         } else if (_evo == 1) {
-            require(beastID.current() + _amount <= hulkiInfo.beastTS);
+            require(beastId + _amount <= hulkiInfo.beastTS);
             for (uint256 x; x < _amount; x++) {
-                beastID.increment();
-                _safeMint(_to, beastID.current());
+                beastId++;
+                _safeMint(_to, beastId);
                 _setTokenURI(
-                    beastID.current(),
+                    beastId,
                     string(
                         abi.encodePacked(
                             hulkiInfo.beastURI,
-                            beastID.current().toString(),
+                            beastId.toString(),
                             ".json"
                         )
                     )
                 );
             }
         } else if (_evo == 2) {
-            require(warID.current() + _amount <= hulkiInfo.warTS);
+            require(warId + _amount <= hulkiInfo.warTS);
             for (uint256 x; x < _amount; x++) {
-                warID.increment();
-                _safeMint(_to, warID.current());
+                warId++;
+                _safeMint(_to, warId);
                 _setTokenURI(
-                    warID.current(),
+                    warId,
                     string(
                         abi.encodePacked(
                             hulkiInfo.warURI,
-                            warID.current().toString(),
+                            warId.toString(),
                             ".json"
                         )
                     )
                 );
             }
         } else if (_evo == 3) {
-            require(battleID.current() + _amount <= hulkiInfo.battleTS);
+            require(battleId + _amount <= hulkiInfo.battleTS);
             for (uint256 x; x < _amount; x++) {
-                battleID.increment();
-                _safeMint(_to, battleID.current());
+                battleId++;
+                _safeMint(_to, battleId);
                 _setTokenURI(
-                    battleID.current(),
+                    battleId,
                     string(
                         abi.encodePacked(
                             hulkiInfo.battleURI,
-                            battleID.current().toString(),
+                            battleId.toString(),
                             ".json"
                         )
                     )
                 );
             }
         } else if (_evo == 4) {
-            require(valhallaID.current() + _amount <= hulkiInfo.valhallaTS);
+            require(valhallaId + _amount <= hulkiInfo.valhallaTS);
             for (uint256 x; x < _amount; x++) {
-                valhallaID.increment();
-                _safeMint(_to, valhallaID.current());
+                valhallaId++;
+                _safeMint(_to, valhallaId);
                 _setTokenURI(
-                    valhallaID.current(),
+                    valhallaId,
                     string(
                         abi.encodePacked(
                             hulkiInfo.valhallaURI,
-                            valhallaID.current().toString(),
+                            valhallaId.toString(),
                             ".json"
                         )
                     )
@@ -293,23 +279,7 @@ contract Hulki is ERC721URIStorage, Ownable {
         round = _round;
     }
 
-    /**
-    * @notice getter function for checking which ID belongs to which evo
-    * @param _mode => valhalla, battle, war, etc.
-    * */
-    function getTokenIds(uint8 _mode) public view returns (uint256[] memory) {
-        if (_mode == 0) {
-            return valhallaTokens;
-        } else if (_mode == 1) {
-            return battleTokens;
-        } else if (_mode == 2) {
-            return warTokens;
-        } else if (_mode == 3) {
-            return beastTokens;
-        } else if (_mode == 4) {
-            return mintedInLastRoundTokens;
-        } else {
-            revert("Wrong _mode");
-        }
+    function getTokenIdsMintedInLastRound() public view returns (uint256[] memory) {
+        return mintedInLastRoundTokens;
     }
 }
