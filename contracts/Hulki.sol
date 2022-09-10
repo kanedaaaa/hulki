@@ -13,20 +13,21 @@ contract Hulki is ERC721URIStorage, Ownable {
     string endURI = "";
     uint256 price;
 
+    /** @notice admin info */
+    uint8 public round;
+
     /** @notice approved managers, such as staking contract */
     mapping(address => bool) public approved;
     /** @notice token IDs, required for staking */
     uint256[] public mintedInLastRoundTokens;
-    /** @notice minting (5) rounds */
-    uint8 public round;
 
-    /** @notice counters for nft ids */
+    /** @notice counters for nft ids */                  
     uint256 bannerId = 0;
-    uint256 beastId = 1800;
-    uint256 warId = 2400;
-    uint256 battleId = 2800;
-    uint256 valhallaId = 3000;
-    uint256 cap = 3200;
+    uint256 beastId = 1000;
+    uint256 warId = 1800;
+    uint256 battleId = 2400;
+    uint256 valhallaId = 2800;
+    uint256 cap = 3000;
 
     constructor() ERC721("Hulki", "H") {
         approved[msg.sender] = true;
@@ -54,38 +55,53 @@ contract Hulki is ERC721URIStorage, Ownable {
         } else if (_mode == 1) {
             require(msg.value >= price * _amount, "Price not paid");
             if (round == 0) {
+                require(_amount + bannerId <= 200, "A");
                 _lowMint(0, _amount, msg.sender, false);
                 if (_amount >= 5 && _amount < 10) {
+                    require(1 + beastId <= 1200, "B");
                     _lowMint(1, 1, msg.sender, false);
                 } else if (_amount >= 10 && _amount < 15) {
+                    require(1 + warId <= 2000, "C");
                     _lowMint(2, 1, msg.sender, false);
                 } else if (_amount >= 15 && _amount < 20) {
+                    require(1 + battleId <= 2600, "D");
                     _lowMint(3, 1, msg.sender, false);
                 } else if (_amount >= 20) {
+                    require(1 + valhallaId <= 3000, "E");
                     _lowMint(4, 1, msg.sender, false);
                 }
             } else if (round == 1) {
+                require(_amount + bannerId <= 400, "");
                 _lowMint(0, _amount, msg.sender, false);
                 if (_amount >= 5 && _amount < 10) {
+                    require(1 + beastId <= 1400, "");
                     _lowMint(1, 1, msg.sender, false);
                 } else if (_amount >= 10 && _amount < 15) {
+                    require(1 + warId <= 2200, "");
                     _lowMint(2, 1, msg.sender, false);
                 } else if (_amount >= 15) {
+                    require(1 + battleId <= 2800, "");
                     _lowMint(3, 1, msg.sender, false);
                 }
             } else if (round == 2) {
+                require(_amount + bannerId <= 600, "");
                 _lowMint(0, _amount, msg.sender, false);
                 if (_amount >= 5 && _amount < 10) {
+                    require(1 + beastId <= 1600, "");
                     _lowMint(1, 1, msg.sender, false);
                 } else if (_amount >= 10) {
+                    require(1 + warId <= 2400, "");
                     _lowMint(2, 1, msg.sender, false);
                 }
             } else if (round == 3) {
+                require(_amount + bannerId <= 800, "");
                 _lowMint(0, _amount, msg.sender, false);
                 if (_amount >= 5) {
+                    require(1 + beastId <= 1800, "");
                     _lowMint(1, 1, msg.sender, false);
                 }
             } else if (round == 4) {
+                require(_amount + bannerId <= 1000, "");
                 _lowMint(0, _amount, msg.sender, true);
             }
         }
@@ -128,7 +144,6 @@ contract Hulki is ERC721URIStorage, Ownable {
         bool _lastRound
     ) internal {
         if (_evo == 0) {
-            require(bannerId + _amount <= beastId, "");
             for (uint256 x; x < _amount; x++) {
                 bannerId++;
                 _safeMint(_to, bannerId);
@@ -144,7 +159,6 @@ contract Hulki is ERC721URIStorage, Ownable {
                 }
             }
         } else if (_evo == 1) {
-            require(beastId + _amount <= warId);
             for (uint256 x; x < _amount; x++) {
                 beastId++;
                 _safeMint(_to, beastId);
@@ -156,7 +170,6 @@ contract Hulki is ERC721URIStorage, Ownable {
                 );
             }
         } else if (_evo == 2) {
-            require(warId + _amount <= battleId);
             for (uint256 x; x < _amount; x++) {
                 warId++;
                 _safeMint(_to, warId);
@@ -166,7 +179,6 @@ contract Hulki is ERC721URIStorage, Ownable {
                 );
             }
         } else if (_evo == 3) {
-            require(battleId + _amount <= valhallaId);
             for (uint256 x; x < _amount; x++) {
                 battleId++;
                 _safeMint(_to, battleId);
@@ -178,7 +190,6 @@ contract Hulki is ERC721URIStorage, Ownable {
                 );
             }
         } else if (_evo == 4) {
-            require(valhallaId + _amount <= cap);
             for (uint256 x; x < _amount; x++) {
                 valhallaId++;
                 _safeMint(_to, valhallaId);

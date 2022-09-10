@@ -60,7 +60,7 @@ describe("Hulki", () => {
           value: ethers.utils.parseEther("7"),
         });
 
-      let ownerof = await hulki.ownerOf(1801);
+      let ownerof = await hulki.ownerOf(1001);
       expect(ownerof).to.equal(user.address);
     });
 
@@ -75,7 +75,7 @@ describe("Hulki", () => {
 
       await hulki.connect(owner).mint(0, 0, 0, 1, user.address);
 
-      let ownerof = await hulki.ownerOf(1801);
+      let ownerof = await hulki.ownerOf(1001);
       expect(ownerof).to.equal(user.address);
     });
 
