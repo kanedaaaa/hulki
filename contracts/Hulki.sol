@@ -14,11 +14,6 @@ contract Hulki is ERC721URIStorage, Ownable {
         string warURI;
         string battleURI;
         string valhallaURI;
-        uint256 bannerTS;
-        uint256 beastTS;
-        uint256 warTS;
-        uint256 battleTS;
-        uint256 valhallaTS;
         uint256 price;
     }
 
@@ -37,6 +32,7 @@ contract Hulki is ERC721URIStorage, Ownable {
     uint256 warId = 2400;
     uint256 battleId = 2800;
     uint256 valhallaId = 3000;
+    uint256 cap = 3200;
 
     constructor() ERC721("Hulki", "H") {
         approved[msg.sender] = true;
@@ -55,14 +51,14 @@ contract Hulki is ERC721URIStorage, Ownable {
         uint8 _mode,
         uint8 _amount,
         uint8 _evo,
-        uint256 _tokenId
+        uint256 _tokenId,
+        address _to
     ) public payable {
         if (_mode == 0) {
-            // staking mint
             require(approved[msg.sender], "msg.sender is not approved");
-            evolve(_evo, _tokenId, msg.sender);
+            evolve(_evo, _tokenId, _to);
         } else if (_mode == 1) {
-            //require(msg.value >= hulkiInfo.price * _amount, "Price not paid");
+            require(msg.value >= hulkiInfo.price * _amount, "Price not paid");
             if (round == 0) {
                 _lowMint(0, _amount, msg.sender, false);
                 if (_amount >= 5 && _amount < 10) {
@@ -82,7 +78,7 @@ contract Hulki is ERC721URIStorage, Ownable {
                     _lowMint(2, 1, msg.sender, false);
                 } else if (_amount >= 15) {
                     _lowMint(3, 1, msg.sender, false);
-                } 
+                }
             } else if (round == 2) {
                 _lowMint(0, _amount, msg.sender, false);
                 if (_amount >= 5 && _amount < 10) {
@@ -97,18 +93,17 @@ contract Hulki is ERC721URIStorage, Ownable {
                 }
             } else if (round == 4) {
                 _lowMint(0, _amount, msg.sender, true);
-                
             }
         }
     }
 
     /**
-    * @notice evolution is a process of sending lower evo tokens 
-    * and in exchange getting higher evo token. Called by staking
-    * contract.
-    * @param _evo => level of evolution
-    * @param _tokenId => id of token to burn
-    * @param _to => "msg.sender"
+     * @notice evolution is a process of sending lower evo tokens
+     * and in exchange getting higher evo token. Called by staking
+     * contract.
+     * @param _evo => level of evolution
+     * @param _tokenId => id of token to burn
+     * @param _to => "msg.sender"
      */
     function evolve(
         uint8 _evo,
@@ -139,7 +134,7 @@ contract Hulki is ERC721URIStorage, Ownable {
         bool _lastRound
     ) internal {
         if (_evo == 0) {
-            //require(bannerId + _amount <= hulkiInfo.bannerTS);
+            require(bannerId + _amount <= beastId, "");
             for (uint256 x; x < _amount; x++) {
                 bannerId++;
                 _safeMint(_to, bannerId);
@@ -159,7 +154,7 @@ contract Hulki is ERC721URIStorage, Ownable {
                 }
             }
         } else if (_evo == 1) {
-            //require(beastId + _amount <= hulkiInfo.beastTS);
+            require(beastId + _amount <= warId);
             for (uint256 x; x < _amount; x++) {
                 beastId++;
                 _safeMint(_to, beastId);
@@ -175,7 +170,7 @@ contract Hulki is ERC721URIStorage, Ownable {
                 );
             }
         } else if (_evo == 2) {
-            //require(warId + _amount <= hulkiInfo.warTS);
+            require(warId + _amount <= battleId);
             for (uint256 x; x < _amount; x++) {
                 warId++;
                 _safeMint(_to, warId);
@@ -191,7 +186,7 @@ contract Hulki is ERC721URIStorage, Ownable {
                 );
             }
         } else if (_evo == 3) {
-            //require(battleId + _amount <= hulkiInfo.battleTS);
+            require(battleId + _amount <= valhallaId);
             for (uint256 x; x < _amount; x++) {
                 battleId++;
                 _safeMint(_to, battleId);
@@ -207,7 +202,7 @@ contract Hulki is ERC721URIStorage, Ownable {
                 );
             }
         } else if (_evo == 4) {
-            //require(valhallaId + _amount <= hulkiInfo.valhallaTS);
+            require(valhallaId + _amount <= cap);
             for (uint256 x; x < _amount; x++) {
                 valhallaId++;
                 _safeMint(_to, valhallaId);
@@ -239,7 +234,6 @@ contract Hulki is ERC721URIStorage, Ownable {
     /**
      * @notice set hulki info
      * @param _bannerUri => etc, token URIs
-     * @param _bannerTs => etc, total supply
      * @param _price => token price in eth (*10**18)
      */
     function setHulkiInfo(
@@ -248,11 +242,6 @@ contract Hulki is ERC721URIStorage, Ownable {
         string memory _warUri,
         string memory _battleUri,
         string memory _valhallaUri,
-        uint256 _bannerTs,
-        uint256 _beastTs,
-        uint256 _warTs,
-        uint256 _battleTs,
-        uint256 _valhallaTs,
         uint256 _price
     ) public onlyOwner {
         hulkiInfo = HulkiInfo(
@@ -261,11 +250,6 @@ contract Hulki is ERC721URIStorage, Ownable {
             _warUri,
             _battleUri,
             _valhallaUri,
-            _bannerTs,
-            _beastTs,
-            _warTs,
-            _battleTs,
-            _valhallaTs,
             _price
         );
     }
@@ -279,7 +263,11 @@ contract Hulki is ERC721URIStorage, Ownable {
         round = _round;
     }
 
-    function getTokenIdsMintedInLastRound() public view returns (uint256[] memory) {
+    function getTokenIdsMintedInLastRound()
+        public
+        view
+        returns (uint256[] memory)
+    {
         return mintedInLastRoundTokens;
     }
 }

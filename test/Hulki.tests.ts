@@ -15,11 +15,6 @@ describe("Hulki", () => {
         "warURI",
         "battleURI",
         "valhallaURI",
-        200,
-        200,
-        200,
-        200,
-        200,
         1
       );
 
@@ -35,7 +30,9 @@ describe("Hulki", () => {
             1,
             2,
             0,
-            0
+            0,
+            user.address,
+            {value: ethers.utils.parseEther("2")}
         );
 
         let ownerof = await hulki.ownerOf(1);
@@ -50,7 +47,9 @@ describe("Hulki", () => {
             1,
             4,
             0,
-            0
+            0,
+            user.address,
+            {value: ethers.utils.parseEther("4")}
         );
 
         let ownerof = await hulki.ownerOf(2);
@@ -68,11 +67,37 @@ describe("Hulki", () => {
             1, 
             7,
             0,
-            0
+            0,
+            user.address,
+            {value: ethers.utils.parseEther("7")}
         );
 
         let ownerof = await hulki.ownerOf(1801);
         expect(ownerof).to.equal(user.address);
     });
+
+    it("evolution", async () => {
+        const {hulki, owner, user} = await deploy();
+        await hulki.connect(owner).setRound(0);
+        await hulki.connect(user).mint(
+          1, 
+          2, 
+          0,
+          0,
+          user.address,
+          {value: ethers.utils.parseEther("2")}
+        );
+
+        await hulki.connect(owner).mint(
+          0,
+          0,
+          0,
+          1,
+          user.address
+        );
+
+        let ownerof = await hulki.ownerOf(1801);
+        expect(ownerof).to.equal(user.address);
+    })
   });
 });
