@@ -8,17 +8,11 @@ import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
 contract Hulki is ERC721URIStorage, Ownable {
     using Strings for uint256;
 
-    struct HulkiInfo {
-        string bannerURI;
-        string beastURI;
-        string warURI;
-        string battleURI;
-        string valhallaURI;
-        uint256 price;
-    }
+    /** @notice token uris and price per token */
+    string startURI = "";
+    string endURI = "";
+    uint256 price;
 
-    /** @notice token uris, counters and supply */
-    HulkiInfo hulkiInfo;
     /** @notice approved managers, such as staking contract */
     mapping(address => bool) public approved;
     /** @notice token IDs, required for staking */
@@ -58,7 +52,7 @@ contract Hulki is ERC721URIStorage, Ownable {
             require(approved[msg.sender], "msg.sender is not approved");
             evolve(_evo, _tokenId, _to);
         } else if (_mode == 1) {
-            require(msg.value >= hulkiInfo.price * _amount, "Price not paid");
+            require(msg.value >= price * _amount, "Price not paid");
             if (round == 0) {
                 _lowMint(0, _amount, msg.sender, false);
                 if (_amount >= 5 && _amount < 10) {
@@ -141,11 +135,7 @@ contract Hulki is ERC721URIStorage, Ownable {
                 _setTokenURI(
                     bannerId,
                     string(
-                        abi.encodePacked(
-                            hulkiInfo.bannerURI,
-                            bannerId.toString(),
-                            ".json"
-                        )
+                        abi.encodePacked(startURI, bannerId.toString(), endURI)
                     )
                 );
 
@@ -161,11 +151,7 @@ contract Hulki is ERC721URIStorage, Ownable {
                 _setTokenURI(
                     beastId,
                     string(
-                        abi.encodePacked(
-                            hulkiInfo.beastURI,
-                            beastId.toString(),
-                            ".json"
-                        )
+                        abi.encodePacked(startURI, beastId.toString(), endURI)
                     )
                 );
             }
@@ -176,13 +162,7 @@ contract Hulki is ERC721URIStorage, Ownable {
                 _safeMint(_to, warId);
                 _setTokenURI(
                     warId,
-                    string(
-                        abi.encodePacked(
-                            hulkiInfo.warURI,
-                            warId.toString(),
-                            ".json"
-                        )
-                    )
+                    string(abi.encodePacked(startURI, warId.toString(), endURI))
                 );
             }
         } else if (_evo == 3) {
@@ -193,11 +173,7 @@ contract Hulki is ERC721URIStorage, Ownable {
                 _setTokenURI(
                     battleId,
                     string(
-                        abi.encodePacked(
-                            hulkiInfo.battleURI,
-                            battleId.toString(),
-                            ".json"
-                        )
+                        abi.encodePacked(startURI, battleId.toString(), endURI)
                     )
                 );
             }
@@ -210,9 +186,9 @@ contract Hulki is ERC721URIStorage, Ownable {
                     valhallaId,
                     string(
                         abi.encodePacked(
-                            hulkiInfo.valhallaURI,
+                            startURI,
                             valhallaId.toString(),
-                            ".json"
+                            endURI
                         )
                     )
                 );
@@ -232,26 +208,19 @@ contract Hulki is ERC721URIStorage, Ownable {
     }
 
     /**
-     * @notice set hulki info
-     * @param _bannerUri => etc, token URIs
-     * @param _price => token price in eth (*10**18)
+     * @notice set info about uris and price
+     * @param _startURI => start of the token uri
+     * @param _endURI => end of the token uri
+     * @param _price => price per token * (10**18)
      */
     function setHulkiInfo(
-        string memory _bannerUri,
-        string memory _beastUri,
-        string memory _warUri,
-        string memory _battleUri,
-        string memory _valhallaUri,
+        string memory _startURI,
+        string memory _endURI,
         uint256 _price
     ) public onlyOwner {
-        hulkiInfo = HulkiInfo(
-            _bannerUri,
-            _beastUri,
-            _warUri,
-            _battleUri,
-            _valhallaUri,
-            _price
-        );
+        startURI = _startURI;
+        endURI = _endURI;
+        price = _price;
     }
 
     /**
@@ -263,11 +232,26 @@ contract Hulki is ERC721URIStorage, Ownable {
         round = _round;
     }
 
+    /**
+     * @notice needed for staking
+     * @return mintedInLastRoundTokens => tokens minted in round 3 (4) */
     function getTokenIdsMintedInLastRound()
         public
         view
         returns (uint256[] memory)
     {
         return mintedInLastRoundTokens;
+    }
+
+    /**
+    * @notice see {ERC721Metadata} */
+    function tokenURI(uint256 tokenId)
+        public
+        view
+        virtual
+        override
+        returns (string memory)
+    {
+        return string(abi.encodePacked(startURI, tokenId.toString(), endURI));
     }
 }
