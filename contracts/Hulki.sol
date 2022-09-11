@@ -9,8 +9,7 @@ contract Hulki is ERC721URIStorage, Ownable {
     using Strings for uint256;
 
     /** @notice token uris and price per token */
-    string startURI = "";
-    string endURI = "";
+    string startURI = "https://hulki-metadata-api.herokuapp.com/metadata/?evo=";
     uint256 price;
 
     /** @notice admin info */
@@ -20,8 +19,12 @@ contract Hulki is ERC721URIStorage, Ownable {
     mapping(address => bool) public approved;
     /** @notice token IDs, required for staking */
     uint256[] public mintedInLastRoundTokens;
+    uint256[] public beastTokens;
+    uint256[] public warTokens;
+    uint256[] public battleTokens;
+    uint256[] public valhallaTokens;
 
-    /** @notice counters for nft ids */                  
+    /** @notice counters for nft ids */
     uint256 bannerId = 0;
     uint256 beastId = 1000;
     uint256 warId = 1800;
@@ -149,9 +152,7 @@ contract Hulki is ERC721URIStorage, Ownable {
                 _safeMint(_to, bannerId);
                 _setTokenURI(
                     bannerId,
-                    string(
-                        abi.encodePacked(startURI, bannerId.toString(), endURI)
-                    )
+                    string(abi.encodePacked(startURI, "banner"))
                 );
 
                 if (_lastRound) {
@@ -164,19 +165,18 @@ contract Hulki is ERC721URIStorage, Ownable {
                 _safeMint(_to, beastId);
                 _setTokenURI(
                     beastId,
-                    string(
-                        abi.encodePacked(startURI, beastId.toString(), endURI)
-                    )
+                    string(abi.encodePacked(startURI, "beast"))
                 );
+
+                beastTokens.push(beastId);
             }
         } else if (_evo == 2) {
             for (uint256 x; x < _amount; x++) {
                 warId++;
                 _safeMint(_to, warId);
-                _setTokenURI(
-                    warId,
-                    string(abi.encodePacked(startURI, warId.toString(), endURI))
-                );
+                _setTokenURI(warId, string(abi.encodePacked(startURI, "war")));
+
+                warTokens.push(warId);
             }
         } else if (_evo == 3) {
             for (uint256 x; x < _amount; x++) {
@@ -184,10 +184,10 @@ contract Hulki is ERC721URIStorage, Ownable {
                 _safeMint(_to, battleId);
                 _setTokenURI(
                     battleId,
-                    string(
-                        abi.encodePacked(startURI, battleId.toString(), endURI)
-                    )
+                    string(abi.encodePacked(startURI, "battle"))
                 );
+
+                battleTokens.push(battleId);
             }
         } else if (_evo == 4) {
             for (uint256 x; x < _amount; x++) {
@@ -195,14 +195,10 @@ contract Hulki is ERC721URIStorage, Ownable {
                 _safeMint(_to, valhallaId);
                 _setTokenURI(
                     valhallaId,
-                    string(
-                        abi.encodePacked(
-                            startURI,
-                            valhallaId.toString(),
-                            endURI
-                        )
-                    )
+                    string(abi.encodePacked(startURI, "valhalla"))
                 );
+
+                valhallaTokens.push(valhallaId);
             }
         } else {
             revert("Wrong _evo");
@@ -221,16 +217,13 @@ contract Hulki is ERC721URIStorage, Ownable {
     /**
      * @notice set info about uris and price
      * @param _startURI => start of the token uri
-     * @param _endURI => end of the token uri
      * @param _price => price per token * (10**18)
      */
     function setHulkiInfo(
         string memory _startURI,
-        string memory _endURI,
         uint256 _price
     ) public onlyOwner {
         startURI = _startURI;
-        endURI = _endURI;
         price = _price;
     }
 
@@ -243,26 +236,19 @@ contract Hulki is ERC721URIStorage, Ownable {
         round = _round;
     }
 
-    /**
-     * @notice needed for staking
-     * @return mintedInLastRoundTokens => tokens minted in round 3 (4) */
-    function getTokenIdsMintedInLastRound()
-        public
-        view
-        returns (uint256[] memory)
-    {
-        return mintedInLastRoundTokens;
-    }
-
-    /**
-    * @notice see {ERC721Metadata} */
-    function tokenURI(uint256 tokenId)
-        public
-        view
-        virtual
-        override
-        returns (string memory)
-    {
-        return string(abi.encodePacked(startURI, tokenId.toString(), endURI));
+    function getIds(uint8 _evo) public view returns (uint256[] memory) {
+        if (_evo == 0) {
+            return beastTokens;
+        } else if (_evo == 1) {
+            return warTokens;
+        } else if (_evo == 2) {
+            return battleTokens;
+        } else if (_evo == 3) {
+            return valhallaTokens;
+        } else if (_evo == 4) {
+            return mintedInLastRoundTokens;
+        } else {
+            revert("Wrong _evo");
+        }
     }
 }
