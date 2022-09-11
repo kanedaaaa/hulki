@@ -1,0 +1,319 @@
+//SPDX-License-Identifier: MIT
+
+pragma solidity >= 0.8.0;
+
+import "@openzeppelin/contracts/utils/math/SafeMath.sol";
+import "./ReentrancyGuard.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "./IPancakeRouterV2.sol";
+import "./IHulki.sol";
+
+contract HULKStakeV2 is Ownable, ReentrancyGuard {
+    using SafeMath for uint256;
+
+    uint256 public DECIMALS = 18;   
+    IHulki internal hulki;
+    IPancakeRouter02 internal _router;
+    //address of the token
+    IERC20 public HULK;
+    uint256 poolFee = 3; // fee deducted from, deposits, withdrawals
+    uint256 feedFee = 3; // fee deducted from feeding
+    uint256 claimFee = 7; // fee deducted from claiming
+
+    uint256 public earlyWithdrawFee = 10;
+    uint256 public earlyWithdrawFeeTime = 3 days;
+    uint256 public feedCycleTime = 8 hours;
+
+    address public devWallet = 0x2E8c54dE18F9f12caab6C0Ddf82b4711F591b6C2;
+    address public _feedWallet = 0x2E8c54dE18F9f12caab6C0Ddf82b4711F591b6C2;
+
+    struct userStakeProfile {
+        uint256 stakedAmount;
+        uint256 claimedAmount;
+        uint256 lastBlockCompounded;
+
+        uint256 lastBlockTimeStaked;
+        uint256 lastFeedBlock;
+
+        uint256 compoundCounter;
+        uint256 stakedTokenId;
+    }
+    
+    mapping (address => userStakeProfile) public stakings;
+    mapping (uint256 => uint256) public multipliers;
+
+    uint256 public ETHPerBlockBase;
+    uint256 public totalUsers;
+    uint256 public totalStaked;
+    uint256 public totalClaimed;
+  
+    event StakeUpdated (address indexed recipeint, uint256 indexed _amount);
+    event RewardClaimed (address indexed recipeint, uint256 indexed _amount);
+    event FeedClaimed (address indexed recipeint, uint256 indexed _amount);
+
+    constructor () {
+        
+        setRouter(0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D);
+        HULK = IERC20(0x0a663042bD545de33Ed19ca1b1E1305491EFBF42);
+
+        // set base block reward
+        setETHPerBlockBase(40000000000000); // set ETH per block to 0.00004 ETH. ~6646 blocks in 24h. 0.00004 x 6646 = 0.26584 ETH 
+
+        // set multipliers
+        setMultiplier(1, 0); // level 1 : 0 multiplier
+        setMultiplier(2, 10); // level 2 : 10% multiplier
+        setMultiplier(3, 15); // level 3 : 15% multiplier
+        setMultiplier(4, 25); // level 4 : 25% multiplier
+
+    }
+
+    // updates router
+    function setRouter(address routerAddress) public onlyOwner {
+		require(routerAddress != address(0), "Cannot use the zero address as router address");
+		_router = IPancakeRouter02(routerAddress);
+	}
+
+    // returns total reserve 
+    function totalPoolReserve() public view returns(uint256){
+        return address(this).balance;
+    }
+
+    // swap function
+    function swapETHForTokens(address to, address token, uint256 ETHAmount) internal returns(bool) { 
+		// Generate pair for WETH -> Future
+		address[] memory path = new address[](2);
+		path[0] = _router.WETH();
+		path[1] = token;
+        
+		// Swap and send the tokens to the 'to' address
+		try _router.swapExactETHForTokensSupportingFeeOnTransferTokens{ value: ETHAmount }(0, path, to, block.timestamp + 360) { 
+			return true;
+		} 
+		catch { 
+			return false;
+		}
+	}
+
+    // Set reward amount per block
+    function setETHPerBlockBase (uint256 _amount) public onlyOwner {
+        require(_amount >= 0, "HULK per Block can not be negative" );
+        ETHPerBlockBase = _amount;
+    }
+
+    // set multiplier
+    function setMultiplier(uint256 _level, uint256 _multiplier) public onlyOwner{
+        multipliers[_level] = _multiplier;
+    }
+
+    // grabs multiplier depending on inputted level
+    function getMultiplier(uint256 _level) external view returns(uint256){
+        return(multipliers[_level]);
+    }
+
+    // updates cycle times for new values
+    function setTimes(uint256 _withdrawTime, uint256 _feedTime) external onlyOwner{
+      earlyWithdrawFeeTime = _withdrawTime;
+      feedCycleTime = _feedTime;
+    }
+
+    // calculates block reward depended on level
+    function calculateBlockReward(uint256 _level)public view returns(uint256){
+        uint256 _multiplier = multipliers[_level];
+        uint256 multiplier = ETHPerBlockBase / 100 * _multiplier;
+        return(ETHPerBlockBase+multiplier);
+    }
+
+    /// Stake the provided amount
+    function enterStaking (uint256 _amount, uint256 _tokenId) public isHuman {
+        require(HULK.balanceOf(msg.sender) >= _amount, "Insufficient HULK tokens for transfer");
+        require(_amount > 0,"Invalid staking amount");
+        require(totalPoolReserve() > 0, "Reward Pool Exhausted");
+        require(hulki.ownerOf(_tokenId) == msg.sender, "Not a token owner");
+
+        HULK.transferFrom(msg.sender, address(this), _amount);
+        _amount = takeHULKPoolFee(_amount);
+
+        userStakeProfile memory profile = stakings[msg.sender];
+        require(profile.stakedTokenId == 0, "Already staking");
+
+        if(profile.stakedAmount == 0){
+            profile.lastBlockCompounded = block.number;
+            totalUsers++;
+        }
+            profile.stakedAmount += _amount;
+            profile.lastBlockTimeStaked = block.timestamp;
+
+            totalStaked += _amount;
+
+        hulki.transferFrom(msg.sender, address(this), _tokenId);
+        profile.stakedTokenId = _tokenId;
+        
+        stakings[msg.sender] = profile; 
+    }
+
+    //leaves staking 
+    function leaveStaking (uint256 _amount) public isHuman {
+        userStakeProfile memory profile = stakings[msg.sender];
+        require(profile.stakedAmount >= _amount, "Withdraw amount can not be greater than stake");
+
+        totalStaked -= _amount;
+        profile.stakedAmount -= _amount;
+        stakings[msg.sender] = profile;
+
+        // claim pending reward
+            if(getReward(msg.sender) > 0){
+                claim();   
+            }
+            
+        if(block.timestamp < stakings[msg.sender].lastBlockTimeStaked.add(earlyWithdrawFeeTime)){
+            uint256 withdrawalFee = _amount * earlyWithdrawFee / 100;
+            _amount -= withdrawalFee;
+            HULK.transfer(devWallet, withdrawalFee);
+        }else{
+            _amount = takeHULKPoolFee(_amount);
+        }
+
+        profile.lastBlockCompounded = block.number;
+        HULK.transfer(msg.sender, _amount);
+        hulki.transferFrom(address(this), msg.sender, profile.stakedTokenId);
+
+        //remove
+        if(stakings[msg.sender].stakedAmount == 0){
+            totalUsers--;
+            delete stakings[msg.sender];
+        }
+    }
+    
+    // gets reward amount from a user
+    function getReward(address _address) internal view returns (uint256) {
+  
+  
+         /*
+         NFT LOGIC CHECK HERE fetch level from nft and input
+        */
+        uint256 blockReward = calculateBlockReward(0);
+
+        if(block.number <= stakings[_address].lastBlockCompounded){
+            return 0;
+        }else {
+            uint256 totalPool = totalPoolReserve();
+            if(totalPool == 0 || totalStaked == 0 ){
+                return 0;
+            }else {    
+
+                uint256 blocks = block.number.sub(stakings[_address].lastBlockCompounded);
+                //if the staker reward is greater than total pool => set it to total pool
+                uint256 totalReward = blocks.mul(blockReward);
+                uint256 stakerReward = totalReward.mul(stakings[_address].stakedAmount).div(totalStaked);
+                if(stakerReward > totalPool){
+                    stakerReward = totalPool;
+                }
+                return stakerReward;
+            }
+            
+        }
+    }
+
+    /// Get pending rewards of a user to display on DAPP, even if farming is disabled it shows remaining balance
+    function pendingReward (address _address) public view returns (uint256){
+        return getReward(_address);
+    }
+
+    /// transfers the rewards of a user to their address
+    function claim() public isHuman{
+        uint256 reward = getReward(msg.sender);
+        reward = takeFeeInEth(reward,claimFee); 
+        (bool os, ) = payable(msg.sender).call{value: reward}("");
+        require(os,"failed claim");
+        stakings[msg.sender].claimedAmount = stakings[msg.sender].claimedAmount.add(reward);
+        stakings[msg.sender].lastBlockCompounded = block.number;
+        totalClaimed = totalClaimed.add(reward);
+
+        emit RewardClaimed(msg.sender, reward);
+    }
+
+     /// feeds the nft, dont forget to add nft logic when intergated
+    function feed() public isHuman {
+        require(stakings[msg.sender].stakedAmount > 0, "Please Stake HULK to feed");
+        require(block.timestamp >= stakings[msg.sender].lastFeedBlock + feedCycleTime, "not time to feed");
+
+        uint256 reward = getReward(msg.sender);
+        reward = takeFeeInEth(reward,feedFee); 
+
+        // swap reward to extra tokens and log
+   	    uint256 initialBalance = HULK.balanceOf(address(this));
+        require(swapETHForTokens(address(this), address(HULK), reward),"swapping failed");
+        uint256 addedBalance = HULK.balanceOf(address(this)) - initialBalance;
+
+        // send feed tokens to feed address
+        HULK.transfer(_feedWallet, addedBalance);
+        totalClaimed = totalClaimed.add(reward);
+
+        /*
+        NFT LOGIC HERE FOR FEED FUNCTION
+        */
+
+        userStakeProfile memory profile = stakings[msg.sender];
+        profile.compoundCounter++;
+
+        //see what evolution user owns 
+        uint256 evo = hulki.getTokenEvo(profile.stakedTokenId);
+
+        if (evo == 0) {
+            // apply beast multi
+        } else if (evo == 1) {
+            // apply war multi
+        } else if (evo == 2) {
+            // apply battle multi
+        } else if (evo == 3) {
+            // apply valhalla multi
+        }
+
+        
+        stakings[msg.sender].lastFeedBlock = block.timestamp;
+        emit FeedClaimed(msg.sender,reward);
+    }
+
+    // update ecosystem wallet
+    function updateWallets(address _dev, address _feed) public onlyOwner{
+        devWallet = _dev;
+        _feedWallet = _feed;
+    }
+
+    // update pool fee
+    function updateFees(uint256 _feed, uint256 _poolFee, uint256 _claimFee) public onlyOwner{
+       poolFee = _poolFee;
+       feedFee = _feed;
+       claimFee = _claimFee;
+    }
+    
+    // remove ETH from totalpool in case of emergency/migration
+    function migratePool() public payable onlyOwner {
+        (bool os, ) = payable(devWallet).call{value: totalPoolReserve()}("");
+        require(os);
+    }
+
+    // sends ETH fee and returns remaining reward for user
+    function takeFeeInEth(uint256 reward, uint256 _fee) internal view returns(uint256){
+        uint256 Fee = reward / 100 * _fee; // take fee 
+        reward -= Fee;
+		devWallet.call{value:Fee};
+        return reward;
+    }
+
+    // sends HULK fee and burns a portion of it
+    function takeHULKPoolFee(uint256 reward) internal returns(uint256){
+        uint256 Fee = reward / 100 * poolFee; // take fee 
+        reward -= Fee;
+        HULK.transfer(devWallet,Fee);
+        return reward;
+    }
+
+    function returnStakeData() public view returns (bytes memory) {
+        return abi.encode(HULK.balanceOf(msg.sender), stakings[msg.sender].stakedAmount, pendingReward(msg.sender), totalPoolReserve(), totalUsers, totalClaimed, totalStaked,ETHPerBlockBase);
+    }
+
+    // Ensures that the contract is able to receive ETH and adds it to the total pool
+    receive() external payable {}
+}
